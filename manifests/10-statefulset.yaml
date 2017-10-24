@@ -1,0 +1,68 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: infra
+  labels:
+    infra: zookeeper
+spec:
+  serviceName: zk
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        infra: zookeeper
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: zookeeper
+        image: gn00023040/kubernetes-zookeeper-exhibitor:3.4.11-1.5.6
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ZK_MAX_SERVERS
+          value: "3"
+        - name: ZK_STATEFULSET_NAME
+          value: zookeeper
+        - name: ZK_GOVERNING_SERVICE_NAME
+          value: zk
+        ports:
+        - containerPort: 2181
+          name: client
+        - containerPort: 2888
+          name: peer
+        - containerPort: 3888
+          name: leader-election
+        - containerPort: 8181
+          name: exhibitor
+        volumeMounts:
+        - name: datadir
+          mountPath: /var/lib/zookeeper
+        - name: backup-config
+          mountPath: /var/lib/zookeeper_config
+        livenessProbe:
+          exec:
+            command:
+            - /opt/zookeeper/bin/zkServer.sh
+            - status
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /opt/zookeeper/bin/zkServer.sh
+            - status
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+      volumes:
+      - name: backup-config
+        hostPath:
+          path: /store/zookeeper/config
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ "ReadWriteMany" ]
+      storageClassName: hostpath
+      resources:
+        requests:
+          storage: 8Gi
